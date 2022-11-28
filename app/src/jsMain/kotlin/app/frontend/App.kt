@@ -1,15 +1,9 @@
 package app.frontend
 
 import app.model.*
-import dev.fritz2.binding.*
-import dev.fritz2.dom.html.Keys
-import dev.fritz2.dom.html.RenderContext
-import dev.fritz2.dom.html.render
-import dev.fritz2.dom.key
-import dev.fritz2.dom.states
-import dev.fritz2.dom.values
-import dev.fritz2.repositories.rest.restQuery
-import dev.fritz2.routing.router
+import dev.fritz2.core.*
+import dev.fritz2.repository.rest.restQueryOf
+import dev.fritz2.routing.routerOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 
@@ -22,17 +16,17 @@ val filters = mapOf(
 )
 
 const val endpoint = "/api/todos"
-val validator = ToDoValidator()
-val router = router("all")
+//val validator = ToDoValidator()
+val router = routerOf("all")
 
 object ToDoListStore : RootStore<List<ToDo>>(emptyList(), id = "todos") {
 
-    private val restRepo = restQuery<ToDo, Long, Unit>(ToDoResource, endpoint, -1)
+    private val restRepo = restQueryOf<ToDo, Long, Unit>(ToDoResource, endpoint, -1)
 
     private val query = handle { restRepo.query(Unit) }
 
     val save = handle<ToDo> { toDos, new ->
-        if (validator.isValid(new, Unit))
+        if (new.text.isNotBlank())
             restRepo.addOrUpdate(toDos, new)
         else toDos
     }
@@ -77,12 +71,6 @@ fun RenderContext.inputHeader() {
     header {
         h1 { +"todos" }
 
-        validator.data.renderEach(ToDoMessage::id) {
-            div("alert") {
-                +it.text
-            }
-        }
-
         input("new-todo") {
             placeholder("What needs to be done?")
             autofocus(true)
@@ -109,10 +97,10 @@ fun RenderContext.mainSection() {
             ToDoListStore.data.combine(router.data) { all, route ->
                 filters[route]?.function?.invoke(all) ?: all
             }.renderEach(ToDo::id) { toDo ->
-                val toDoStore = storeOf(toDo)
-                toDoStore.syncBy(ToDoListStore.save)
-                val textStore = toDoStore.sub(L.ToDo.text)
-                val completedStore = toDoStore.sub(L.ToDo.completed)
+                val toDoStore = ToDoListStore.sub(toDo, ToDo::id)
+                toDoStore.data.drop(1) handledBy ToDoListStore.save
+                val textStore = toDoStore.sub(ToDo.text())
+                val completedStore = toDoStore.sub(ToDo.completed())
 
                 val editingStore = storeOf(false)
 
@@ -132,27 +120,27 @@ fun RenderContext.mainSection() {
                             changes.states() handledBy completedStore.update
                         }
                         label {
-                            textStore.data.asText()
+                            textStore.data.renderText()
 
                             dblclicks.map { true } handledBy editingStore.update
                         }
                         button("destroy") {
-                            clicks.events.map { toDo.id } handledBy ToDoListStore.remove
+                            clicks.map { toDo.id } handledBy ToDoListStore.remove
                         }
                     }
                     input("edit") {
                         value(textStore.data)
                         changes.values() handledBy textStore.update
 
-                        editingStore.data.onEach { isEditing ->
+                        editingStore.data handledBy { isEditing ->
                             if (isEditing) {
                                 domNode.focus()
                                 domNode.select()
                             }
-                        }.watch()
+                        }
                         merge(
                             blurs.map { false },
-                            keyups.key().filter { it == Keys.Enter }.map { false }
+                            keyups.filter { shortcutOf(it) == Keys.Enter }.map { false }
                         ) handledBy editingStore.update
                     }
                 }
@@ -169,7 +157,7 @@ fun RenderContext.appFooter() {
             strong {
                 ToDoListStore.count.map {
                     "$it item${if (it != 1) "s" else ""} left"
-                }.asText()
+                }
             }
         }
 

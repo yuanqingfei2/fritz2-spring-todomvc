@@ -1,6 +1,5 @@
 package app.backend.data
 
-import app.model.ToDoValidator
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -13,9 +12,6 @@ class ToDoController(val repo: ToDoRepository) {
 
     private val logger: Logger = LoggerFactory.getLogger(this.javaClass)
 
-    private val validator = ToDoValidator()
-
-
     @GetMapping
     fun all(): MutableIterable<ToDoEntity> {
         logger.info("getting all ToDos")
@@ -24,7 +20,7 @@ class ToDoController(val repo: ToDoRepository) {
 
     @PostMapping
     fun add(@RequestBody toDo: ToDoEntity): ResponseEntity<Any> =
-        if (validator.isValid(toDo.toToDo(), Unit)) {
+        if (toDo.toToDo().text.isNotEmpty()) {
             logger.info("save new ToDo: $toDo")
             ResponseEntity.status(HttpStatus.CREATED).body(repo.save(toDo.copy(id = -1)))
         } else {
@@ -35,7 +31,7 @@ class ToDoController(val repo: ToDoRepository) {
     fun update(@PathVariable id: Long, @RequestBody newToDo: ToDoEntity): ResponseEntity<*> =
         if (repo.findById(id).isEmpty) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to "invalid id"))
-        } else if (!validator.isValid(newToDo.toToDo(), Unit)) {
+        } else if (newToDo.toToDo().text.isEmpty()) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).body(mapOf("error" to "data is not valid"))
         } else {
             logger.info("update ToDo[id=$id] to: $newToDo")

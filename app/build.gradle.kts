@@ -1,7 +1,7 @@
 plugins {
   kotlin("multiplatform")
   kotlin("plugin.serialization")
-  id("dev.fritz2.fritz2-gradle")
+  id("com.google.devtools.ksp")
 }
 
 kotlin {
@@ -24,6 +24,7 @@ kotlin {
     val commonMain by getting {
       dependencies {
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${project.extra["serializationVersion"]}")
+        implementation("dev.fritz2:core:${project.extra["fritz2Version"]}")
       }
     }
 
@@ -42,4 +43,14 @@ kotlin {
       }
     }
   }
+}
+
+dependencies {
+  add("kspCommonMainMetadata", "dev.fritz2:lenses-annotation-processor:${project.extra["fritz2Version"]}")
+}
+
+kotlin.sourceSets.commonMain { kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin") }
+tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>>().configureEach  {
+  if (name != "kspCommonMainKotlinMetadata") dependsOn("kspCommonMainKotlinMetadata")
+  kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
 }

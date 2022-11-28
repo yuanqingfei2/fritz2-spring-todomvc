@@ -1,53 +1,72 @@
 package app.model
 
-import dev.fritz2.identification.inspect
-import dev.fritz2.lenses.IdProvider
-import dev.fritz2.lenses.Lenses
-import dev.fritz2.resource.Resource
 import dev.fritz2.validation.ValidationMessage
-import dev.fritz2.validation.Validator
+import dev.fritz2.core.Id
+import dev.fritz2.core.IdProvider
+import dev.fritz2.core.Lenses
+import dev.fritz2.repository.Resource
+import dev.fritz2.validation.Validation
+import dev.fritz2.validation.validation
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
-@Lenses
+enum class Severity {
+    Info,
+    Warning,
+    Error
+}
+
+data class Message(override val path: String, val severity: Severity, val text: String): ValidationMessage {
+    override val isError: Boolean = severity > Severity.Warning
+}
+
 @Serializable
+@Lenses
 data class ToDo(
-    val id: Long = -1,
-    val text: String = "",
+    val id: Long = Id.next().toLong(),
+    val text: String,
     val completed: Boolean = false
-)
-
-data class ToDoMessage(val id: String, val text: String) : ValidationMessage {
-    override fun isError(): Boolean = true
+){
+    companion object
 }
 
-class ToDoValidator : Validator<ToDo, ToDoMessage, Unit>() {
 
-    private val maxTextLength = 50
 
-    override fun validate(data: ToDo, metadata: Unit): List<ToDoMessage> {
-        val msgs = mutableListOf<ToDoMessage>()
-        val inspector = inspect(data, "todos")
 
-        val textInspector = inspector.sub(L.ToDo.text)
+//data class ToDoMessage(val id: String, val text: String) : ValidationMessage {
+//    override val isError: Boolean
+//        get() = true
+//    override val path: String
+//        get() = TODO("Not yet implemented")
+//}
 
-        if (textInspector.data.trim().length < 3) msgs.add(
-            ToDoMessage(
-                textInspector.id,
-                "Text length must be at least 3 characters."
-            )
-        )
-        if (textInspector.data.length > maxTextLength) msgs.add(
-            ToDoMessage(
-                textInspector.id,
-                "Text length is to long (max $maxTextLength chars)."
-            )
-        )
-
-        return msgs
-    }
-}
+//class ToDoValidator : Validator<ToDo, ToDoMessage, Unit>() {
+//
+//    private val maxTextLength = 50
+//
+//    override fun validate(data: ToDo, metadata: Unit): List<ToDoMessage> {
+//        val msgs = mutableListOf<ToDoMessage>()
+//        val inspector = inspect(data, "todos")
+//
+//        val textInspector = inspector.sub(L.ToDo.text)
+//
+//        if (textInspector.data.trim().length < 3) msgs.add(
+//            ToDoMessage(
+//                textInspector.id,
+//                "Text length must be at least 3 characters."
+//            )
+//        )
+//        if (textInspector.data.length > maxTextLength) msgs.add(
+//            ToDoMessage(
+//                textInspector.id,
+//                "Text length is to long (max $maxTextLength chars)."
+//            )
+//        )
+//
+//        return msgs
+//    }
+//}
 
 object ToDoResource : Resource<ToDo, Long> {
     override val idProvider: IdProvider<ToDo, Long> = ToDo::id
