@@ -25,6 +25,7 @@ kotlin {
       dependencies {
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${project.extra["serializationVersion"]}")
         implementation("dev.fritz2:core:${project.extra["fritz2Version"]}")
+        // implementation("dev.fritz2:headless:$fritz2Version") // optional
       }
     }
 
@@ -50,7 +51,6 @@ dependencies {
 }
 
 kotlin.sourceSets.commonMain { kotlin.srcDir("build/generated/ksp/metadata/commonMain/kotlin") }
-tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>>().configureEach  {
+tasks.withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>>().all  {
   if (name != "kspCommonMainKotlinMetadata") dependsOn("kspCommonMainKotlinMetadata")
-  kotlinOptions.freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
 }

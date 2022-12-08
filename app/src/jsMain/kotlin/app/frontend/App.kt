@@ -2,10 +2,12 @@ package app.frontend
 
 import app.model.*
 import dev.fritz2.core.*
-import dev.fritz2.repository.rest.restQueryOf
+import dev.fritz2.remote.data
 import dev.fritz2.routing.routerOf
+import kotlinx.browser.localStorage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import org.w3c.dom.get
 
 data class Filter(val text: String, val function: (List<ToDo>) -> List<ToDo>)
 
@@ -16,35 +18,70 @@ val filters = mapOf(
 )
 
 const val endpoint = "/api/todos"
-//val validator = ToDoValidator()
 val router = routerOf("all")
 
-object ToDoListStore : RootStore<List<ToDo>>(emptyList(), id = "todos") {
+const val persistencePrefix = "todos"
 
-    private val restRepo = restQueryOf<ToDo, Long, Unit>(ToDoResource, endpoint, -1)
+object ToDoListStore : RootStore<List<ToDo>>(emptyList(), persistencePrefix) {
 
-    private val query = handle { restRepo.query(Unit) }
-
-    val save = handle<ToDo> { toDos, new ->
-        if (new.text.isNotBlank())
-            restRepo.addOrUpdate(toDos, new)
-        else toDos
+    private val query = handle {
+        buildList {
+            for (index in 0 until localStorage.length) {
+                val key = localStorage.key(index)
+                if (key != null && key.startsWith(persistencePrefix)) {
+                    add(ToDo.deserialize(localStorage[key]!!))
+                }
+            }
+        }
     }
 
-    val remove = handle { toDos, id: Long ->
-        restRepo.delete(toDos, id)
+    val save = handle<ToDo> { toDos, new ->
+        if (new.text.isNotBlank()) {
+            localStorage.setItem("${persistencePrefix}.${new.id}", ToDo.serialize(new))
+            var inList = false
+            val updatedList = toDos.map {
+                if (it.id == new.id) {
+                    inList = true
+                    new
+                } else it
+            }
+            if (inList) updatedList else toDos + new
+        } else delete(toDos, new.id)
+    }
+
+    val remove = handle<String> { toDos, id ->
+        delete(toDos, id)
+    }
+
+    private fun delete(entities: List<ToDo>, id: String): List<ToDo> {
+        localStorage.removeItem("${persistencePrefix}.$id")
+        return entities.filterNot { it.id == id }
     }
 
     val toggleAll = handle { toDos, toggle: Boolean ->
-        restRepo.updateMany(toDos, toDos.mapNotNull {
-            if(it.completed != toggle) it.copy(completed = toggle) else null
-        })
+        val toUpdate = toDos.mapNotNull {
+            if (it.completed != toggle) it.copy(completed = toggle) else null
+        }
+
+        val updated = (toDos + toUpdate).groupBy{ it.id }
+            .filterValues { it.size > 1 }.mapValues { (id, entities) ->
+                val entity = entities.last()
+                localStorage.setItem(
+                    "${persistencePrefix}.$id",
+                    ToDo.serialize(entity)
+                )
+                entity
+            }
+
+        toDos.map { updated[it.id] ?: it }
     }
 
     val clearCompleted = handle { toDos ->
-        toDos.partition(ToDo::completed).let { (completed, uncompleted) ->
-            restRepo.delete(toDos, completed.map(ToDo::id))
-            uncompleted
+        toDos.partition(ToDo::completed).let { (completed, active) ->
+            completed.map(ToDo::id).forEach {
+                localStorage.removeItem("${persistencePrefix}.$it")
+            }
+            active
         }
     }
 

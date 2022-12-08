@@ -9,7 +9,7 @@ subprojects {
   }
 
   extra.set("serializationVersion", "1.3.1")
-  extra.set("fritz2Version", "1.0-RC1")
+  extra.set("fritz2Version", "1.0-RC2")
 }
 
 plugins {

@@ -12,5 +12,5 @@ data class ToDoEntity(
         val text: String = "",
         val completed: Boolean = false
 ) {
-        fun toToDo() = ToDo(id, text, completed)
+        fun toToDo() = ToDo(id.toString(), text, completed)
 }
